@@ -27,8 +27,9 @@ export function ColorSquare({ runId }: { runId: string }) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let finished = false;
 
-        while (true) {
+        while (!finished) {
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -42,23 +43,19 @@ export function ColorSquare({ runId }: { runId: string }) {
             try {
               const chunk = JSON.parse(trimmed) as ColorCounterChunk;
               setState({ color: chunk.color, number: chunk.number });
-              if (chunk.number >= 5) setComplete(true);
+              if (chunk.number >= 5) {
+                setComplete(true);
+                finished = true;
+                break;
+              }
             } catch {
               // Not valid JSON yet
             }
           }
         }
 
-        // Process remaining buffer
-        if (buffer.trim()) {
-          try {
-            const chunk = JSON.parse(buffer.trim()) as ColorCounterChunk;
-            setState({ color: chunk.color, number: chunk.number });
-            if (chunk.number >= 5) setComplete(true);
-          } catch {
-            // Ignore
-          }
-        }
+        // Done -- cancel the stream so the connection closes
+        reader.cancel();
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
       }

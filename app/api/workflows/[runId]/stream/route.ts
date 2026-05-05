@@ -5,31 +5,38 @@ export async function GET(
   ctx: RouteContext<"/api/workflows/[runId]/stream">,
 ) {
   const { runId } = await ctx.params;
-  const { searchParams } = new URL(request.url);
+  try {
+    const { searchParams } = new URL(request.url);
+    const startIndexParam = searchParams.get("startIndex");
+    const startIndex = startIndexParam
+      ? Number.parseInt(startIndexParam, 10)
+      : undefined;
 
-  const startIndexParam = searchParams.get("startIndex");
-  const startIndex = startIndexParam
-    ? Number.parseInt(startIndexParam, 10)
-    : undefined;
+    const run = getRun(runId);
+    const readable = run.getReadable({ startIndex });
 
-  const run = getRun(runId);
-  const readable = run.getReadable({ startIndex });
+    // Transform typed chunks into NDJSON lines, then encode to bytes
+    const jsonStream = readable
+      .pipeThrough(
+        new TransformStream({
+          transform(chunk, controller) {
+            controller.enqueue(`${JSON.stringify(chunk)}\n`);
+          },
+        }),
+      )
+      .pipeThrough(new TextEncoderStream());
 
-  // Transform typed chunks from the workflow stream into NDJSON lines
-  // so the client can parse them easily.
-  const jsonStream = readable.pipeThrough(
-    new TransformStream({
-      transform(chunk, controller) {
-        controller.enqueue(`${JSON.stringify(chunk)}\n`);
+    return new Response(jsonStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache, no-store",
       },
-    }),
-  );
-
-  return new Response(jsonStream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-cache, no-store",
-      "Transfer-Encoding": "chunked",
-    },
-  });
+    });
+  } catch (error) {
+    console.error("[v0] Stream route error:", error);
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }

@@ -47,8 +47,9 @@ export function WorkflowDashboard() {
       const reader = streamRes.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let found = false;
 
-      while (true) {
+      while (!found) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -64,6 +65,8 @@ export function WorkflowDashboard() {
             if (chunk.childRunIds) {
               setChildRunIds(chunk.childRunIds);
               setState("running");
+              found = true;
+              break;
             }
           } catch {
             // Not valid JSON yet
@@ -71,18 +74,8 @@ export function WorkflowDashboard() {
         }
       }
 
-      // Process remaining buffer
-      if (buffer.trim()) {
-        try {
-          const chunk = JSON.parse(buffer.trim()) as ParentChunk;
-          if (chunk.childRunIds) {
-            setChildRunIds(chunk.childRunIds);
-            setState("running");
-          }
-        } catch {
-          // Ignore
-        }
-      }
+      // We got what we needed -- cancel the parent stream
+      reader.cancel();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setState("idle");
