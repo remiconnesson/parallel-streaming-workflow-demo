@@ -1,4 +1,5 @@
 import { getWritable, sleep } from "workflow";
+import type { ColorCounterChunk } from "@/lib/workflow-types";
 
 const COLORS = [
   "#EF4444", // red
@@ -12,11 +13,6 @@ const COLORS = [
   "#14B8A6", // teal
   "#F43F5E", // rose
 ] as const;
-
-export type ColorCounterChunk = {
-  color: string;
-  number: number;
-};
 
 async function pickColorAndStreamFirst(): Promise<string> {
   "use step";

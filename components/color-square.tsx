@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ColorCounterChunk } from "@/workflows/color-counter";
+import type { ColorCounterChunk } from "@/lib/workflow-types";
 
 type SquareState = {
   color: string;

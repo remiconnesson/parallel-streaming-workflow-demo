@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ColorSquare } from "@/components/color-square";
-import type { ParentChunk } from "@/workflows/parallel-colors";
 
 type DashboardState = "idle" | "starting" | "running";
 
@@ -29,53 +28,11 @@ export function WorkflowDashboard() {
         return;
       }
 
-      const { runId } = (await res.json()) as { runId: string };
-
-      // Subscribe to the parent workflow's stream to get child run IDs
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      const streamRes = await fetch(`/api/workflows/${runId}/stream`, {
-        signal: controller.signal,
-      });
-
-      if (!streamRes.ok || !streamRes.body) {
-        setState("idle");
-        return;
-      }
-
-      const reader = streamRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let found = false;
-
-      while (!found) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const chunk = JSON.parse(trimmed) as ParentChunk;
-            if (chunk.childRunIds) {
-              setChildRunIds(chunk.childRunIds);
-              setState("running");
-              found = true;
-              break;
-            }
-          } catch {
-            // Not valid JSON yet
-          }
-        }
-      }
-
-      // We got what we needed -- cancel the parent stream
-      reader.cancel();
+      const { childRunIds: ids } = (await res.json()) as {
+        childRunIds: string[];
+      };
+      setChildRunIds(ids);
+      setState("running");
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setState("idle");
@@ -178,7 +135,6 @@ function StartingState() {
 }
 
 function WorkflowGrid({ runIds }: { runIds: string[] }) {
-  // Calculate columns based on count for a nice grid
   const cols =
     runIds.length <= 4
       ? "grid-cols-2"

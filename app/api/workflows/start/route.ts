@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
-import { parallelColorsWorkflow } from "@/workflows/parallel-colors";
+import { colorCounterWorkflow } from "@/workflows/color-counter";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { count?: number };
   const count = Math.min(Math.max(body.count ?? 6, 1), 20);
 
-  const run = await start(parallelColorsWorkflow, [count]);
+  // Spawn N child workflows directly from the API route
+  const runs = await Promise.all(
+    Array.from({ length: count }, () => start(colorCounterWorkflow)),
+  );
+  const childRunIds = runs.map((r) => r.runId);
 
-  return NextResponse.json({ runId: run.runId });
+  return NextResponse.json({ childRunIds });
 }
