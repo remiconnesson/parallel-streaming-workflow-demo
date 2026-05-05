@@ -1,0 +1,3 @@
+pnpm verify-format
+pnpm fix
+pnpm tsc --noEmit
