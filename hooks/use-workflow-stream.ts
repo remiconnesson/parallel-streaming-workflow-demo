@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { StreamEvent } from "@/workflows/color-counter";
 
 export type ChildState = {
@@ -13,8 +13,16 @@ export function useWorkflowDemo() {
   const [children, setChildren] = useState<ChildState[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const startDemo = useCallback(async (count: number) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const { signal } = controller;
+
     setIsStarting(true);
     setHasStarted(false);
     setChildren([]);
@@ -24,6 +32,7 @@ export function useWorkflowDemo() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ count }),
+        signal,
       });
 
       if (!response.body) return;
@@ -34,7 +43,7 @@ export function useWorkflowDemo() {
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done || signal.aborted) break;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -69,8 +78,14 @@ export function useWorkflowDemo() {
           }
         }
       }
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") return;
+      throw err;
     } finally {
-      setIsStarting(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setIsStarting(false);
+      }
     }
   }, []);
 
