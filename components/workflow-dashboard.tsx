@@ -5,19 +5,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { WorkflowSquare } from "@/components/workflow-square";
-import { useWorkflowDemo } from "@/hooks/use-workflow-stream";
+import { type ChildState, useWorkflowDemo } from "@/hooks/use-workflow-stream";
+import { FINAL_NUMBER, MAX_CHILDREN } from "@/workflows/color-counter";
 
-function WorkflowGrid({
-  workflows,
-}: {
-  workflows: Array<{
-    runId: string;
-    color: string | null;
-    currentNumber: number | null;
-    done: boolean;
-  }>;
-}) {
-  const completedCount = workflows.filter((c) => c.done).length;
+const isDone = (c: ChildState) => c.currentNumber === FINAL_NUMBER;
+
+function WorkflowGrid({ workflows }: { workflows: ChildState[] }) {
+  const completedCount = workflows.filter(isDone).length;
   const totalCount = workflows.length;
   const allDone = completedCount === totalCount;
 
@@ -44,7 +38,7 @@ function WorkflowGrid({
             color={child.color}
             currentNumber={child.currentNumber}
             index={index}
-            done={child.done}
+            done={isDone(child)}
           />
         ))}
       </div>
@@ -86,7 +80,7 @@ export function WorkflowDashboard() {
             <Slider
               id="workflow-count"
               min={1}
-              max={24}
+              max={MAX_CHILDREN}
               step={1}
               value={[count]}
               onValueChange={([value]) => setCount(value)}
