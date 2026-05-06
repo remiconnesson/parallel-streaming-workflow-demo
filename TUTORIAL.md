@@ -30,13 +30,13 @@ Plugin enables `"use workflow"` and `"use step"` directives via SWC transform.
 
 ---
 
-## 2. Child workflow
+## 2. Shared module (workflow-free)
 
-`workflows/color-counter.ts`. Picks color, streams numbers 1..5, sleeps random 1-5s between each.
+Constants and wire types live in their own file with **no `workflow` imports**. Critical: client components can safely import this. If you import them from a file that touches `workflow`, the client bundle pulls in `@workflow/world-*`, `@vercel/queue`, `node:async_hooks` -> Turbopack build fails.
+
+`lib/workflow-shared.ts`:
 
 ```ts
-import { getWritable, sleep } from "workflow";
-
 export const FINAL_NUMBER = 5;
 export const MAX_CHILDREN = 24;
 
@@ -48,6 +48,15 @@ export type StreamEvent =
       color: string;
       currentNumber: number;
     };
+```
+
+## 3. Child workflow
+
+`workflows/color-counter.ts`. Picks color, streams numbers 1..5, sleeps random 1-5s between each.
+
+```ts
+import { getWritable, sleep } from "workflow";
+import { FINAL_NUMBER } from "@/lib/workflow-shared";
 
 const COLORS = ["#ef4444", "#22c55e", "#3b82f6", "#eab308" /* ... */];
 
@@ -94,17 +103,14 @@ export async function colorCounterWorkflow() {
 
 ---
 
-## 3. Spawn N + multiplex
+## 4. Spawn N + multiplex
 
 `app/api/demo/start/route.ts`. Spawn children parallel, fan-in their streams, emit NDJSON.
 
 ```ts
 import { start } from "workflow/api";
-import {
-  colorCounterWorkflow,
-  MAX_CHILDREN,
-  type StreamEvent,
-} from "@/workflows/color-counter";
+import { MAX_CHILDREN, type StreamEvent } from "@/lib/workflow-shared";
+import { colorCounterWorkflow } from "@/workflows/color-counter";
 
 export async function POST(request: Request) {
   const { count } = (await request.json()) as { count: number };
@@ -170,7 +176,7 @@ export async function POST(request: Request) {
 
 ---
 
-## 4. Client consumer
+## 5. Client consumer
 
 `hooks/use-workflow-stream.ts`. Reads NDJSON, fans state out per child.
 
@@ -178,7 +184,7 @@ export async function POST(request: Request) {
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { StreamEvent } from "@/workflows/color-counter";
+import type { StreamEvent } from "@/lib/workflow-shared";
 
 export type ChildState = {
   runId: string;
@@ -282,7 +288,7 @@ export function useWorkflowDemo() {
 
 ---
 
-## 5. UI
+## 6. UI
 
 `components/workflow-dashboard.tsx`. Derive done from value, don't carry separate flag.
 
@@ -290,7 +296,7 @@ export function useWorkflowDemo() {
 "use client";
 
 import { type ChildState, useWorkflowDemo } from "@/hooks/use-workflow-stream";
-import { FINAL_NUMBER, MAX_CHILDREN } from "@/workflows/color-counter";
+import { FINAL_NUMBER, MAX_CHILDREN } from "@/lib/workflow-shared";
 
 const isDone = (c: ChildState) => c.currentNumber === FINAL_NUMBER;
 
@@ -305,8 +311,9 @@ export function WorkflowDashboard() {
 
 ---
 
-## 6. Pitfalls
+## 7. Pitfalls
 
+- **Client component imports a file that imports `workflow`** -> Turbopack pulls `@workflow/world-*`, `@vercel/queue`, `node:async_hooks` into client bundle -> build fails with `Module not found: fs / net / @opentelemetry/api / node:async_hooks`. Keep shared types/constants in a workflow-free module (`lib/workflow-shared.ts`).
 - **No `closeStream` in `finally`** -> step throw -> stream open -> server reader hangs -> UI never finishes.
 - **`start()` inside workflow body** -> sandbox error. Wrap in `"use step"`.
 - **N>6 without multiplex** -> browser queues connections -> some children appear to skip 1->5 instantly when prior finishes.
@@ -318,7 +325,7 @@ export function WorkflowDashboard() {
 
 ---
 
-## 7. Test
+## 8. Test
 
 Unit tests on steps: just call them. `"use step"` is a no-op without compiler.
 
@@ -367,7 +374,7 @@ For the route handler: hit it with `fetch` against the dev server, assert NDJSON
 
 ---
 
-## 8. Debug
+## 9. Debug
 
 ```bash
 npx workflow health         # endpoints reachable?

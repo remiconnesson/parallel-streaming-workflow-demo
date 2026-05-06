@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { WorkflowSquare } from "@/components/workflow-square";
 import { type ChildState, useWorkflowDemo } from "@/hooks/use-workflow-stream";
-import { FINAL_NUMBER, MAX_CHILDREN } from "@/workflows/color-counter";
+import { FINAL_NUMBER, MAX_CHILDREN } from "@/lib/workflow-shared";
 
 const isDone = (c: ChildState) => c.currentNumber === FINAL_NUMBER;
 

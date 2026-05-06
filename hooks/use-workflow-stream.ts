@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { StreamEvent } from "@/workflows/color-counter";
+import type { StreamEvent } from "@/lib/workflow-shared";
 
 export type ChildState = {
   runId: string;

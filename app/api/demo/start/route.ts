@@ -1,9 +1,6 @@
 import { start } from "workflow/api";
-import {
-  colorCounterWorkflow,
-  MAX_CHILDREN,
-  type StreamEvent,
-} from "@/workflows/color-counter";
+import { MAX_CHILDREN, type StreamEvent } from "@/lib/workflow-shared";
+import { colorCounterWorkflow } from "@/workflows/color-counter";
 
 // Multiplex all child streams into one SSE response so we don't blow
 // the browser's 6-connections-per-host limit.
