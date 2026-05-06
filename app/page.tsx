@@ -1,16 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WorkflowDashboard } from "@/components/workflow-dashboard";
 
 export default function Home() {
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-96 border border-black">
-        <CardHeader>
-          <CardTitle>Project Title</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="italic">Put stuff here...</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <WorkflowDashboard />;
 }
