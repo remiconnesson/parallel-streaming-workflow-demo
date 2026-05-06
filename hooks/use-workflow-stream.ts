@@ -1,37 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import type { StreamEvent } from "@/workflows/color-counter";
 
 export type ChildState = {
   runId: string;
   color: string | null;
   currentNumber: number | null;
-  done: boolean;
 };
 
-type InitEvent = {
-  type: "init";
-  children: Array<{ index: number; runId: string }>;
-};
-
-type UpdateEvent = {
-  type: "update";
-  childIndex: number;
-  runId: string;
-  color: string;
-  currentNumber: number;
-};
-
-type StreamEvent = InitEvent | UpdateEvent;
-
-/**
- * Hook that starts N child workflows and consumes a single
- * multiplexed SSE stream containing updates from all children.
- *
- * This avoids opening N separate fetch connections, which would
- * hit the browser's 6-connection-per-host limit and cause some
- * streams to queue until others finish.
- */
 export function useWorkflowDemo() {
   const [children, setChildren] = useState<ChildState[]>([]);
   const [isStarting, setIsStarting] = useState(false);
@@ -49,10 +26,7 @@ export function useWorkflowDemo() {
         body: JSON.stringify({ count }),
       });
 
-      if (!response.body) {
-        setIsStarting(false);
-        return;
-      }
+      if (!response.body) return;
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -63,53 +37,39 @@ export function useWorkflowDemo() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
+          if (!line.trim()) continue;
+          const event = JSON.parse(line) as StreamEvent;
 
-          try {
-            const event = JSON.parse(trimmed) as StreamEvent;
-
-            if (event.type === "init") {
-              // Initialize all children with empty state
-              const initial: ChildState[] = event.children.map((c) => ({
-                runId: c.runId,
+          if (event.type === "init") {
+            setChildren(
+              event.runIds.map((runId) => ({
+                runId,
                 color: null,
                 currentNumber: null,
-                done: false,
-              }));
-              setChildren(initial);
-              setHasStarted(true);
-              setIsStarting(false);
-            } else if (event.type === "update") {
-              setChildren((prev) => {
-                const next = [...prev];
-                if (next[event.childIndex]) {
-                  next[event.childIndex] = {
-                    runId: event.runId,
-                    color: event.color,
-                    currentNumber: event.currentNumber,
-                    done: event.currentNumber === 5,
-                  };
-                }
-                return next;
-              });
-            }
-          } catch {
-            // skip unparseable lines
+              })),
+            );
+            setHasStarted(true);
+          } else {
+            setChildren((prev) => {
+              const next = [...prev];
+              const existing = next[event.childIndex];
+              if (existing) {
+                next[event.childIndex] = {
+                  ...existing,
+                  color: event.color,
+                  currentNumber: event.currentNumber,
+                };
+              }
+              return next;
+            });
           }
         }
       }
-
-      // Stream ended -- mark any remaining children as done
-      setChildren((prev) =>
-        prev.map((c) => (c.done ? c : { ...c, done: true })),
-      );
-    } catch {
+    } finally {
       setIsStarting(false);
     }
   }, []);
